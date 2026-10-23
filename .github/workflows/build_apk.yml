@@ -39,11 +39,11 @@ jobs:
             cp vula_app.py main.py
           fi
 
-      - name: Build Android APK Non-Interactive
+      - name: Build Android APK
         env:
           ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
         run: |
-          flet build apk --project-name "VulaTrade" --org "com.vulatrade.app" --product "VulaTrade Engine" --description "Offline Micro-Enterprise Engine"
+          printf '\n\n\n\n' | flet build apk
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
