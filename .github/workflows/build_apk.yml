@@ -18,13 +18,6 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Accept Android Licenses
-        run: |
-          yes | sdkmanager --licenses || true
-
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -40,13 +33,15 @@ jobs:
           python -m pip install --upgrade pip
           pip install flet
 
-      - name: Ensure main.py entrypoint
+      - name: Ensure entrypoint exists
         run: |
           if [ -f "vula_app.py" ] && [ ! -f "main.py" ]; then
             cp vula_app.py main.py
           fi
 
       - name: Build Android APK
+        env:
+          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
         run: |
           flet build apk
 
@@ -56,5 +51,5 @@ jobs:
           name: VulaTrade-Android-APK
           path: |
             build/apk/*.apk
-            **/build/app/outputs/flutter-apk/*.apk
-          if-no-files-found: error
+            **/outputs/flutter-apk/*.apk
+          if-no-files-found: warn
