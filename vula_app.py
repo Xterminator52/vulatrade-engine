@@ -736,11 +736,12 @@ def main(page: ft.Page):
             ]
         )
 
-    # VIEW 4: DIGITAL RECEIPT GENERATOR (With Paid Amount & Change Calculation)
+    # VIEW 4: DIGITAL RECEIPT GENERATOR (With Paid Amount, Change Calculation & Direct WhatsApp Routing)
     def build_receipt_generator_view():
         inventory = DatabaseManager.get_inventory()
 
         cust_name_in = ft.TextField(label="Client Name", value="Walk-in Client")
+        cust_phone_in = ft.TextField(label="Customer WhatsApp (Optional)", hint_text="e.g. 0821234567", keyboard_type=ft.KeyboardType.PHONE)
         biz_name_in = ft.TextField(label="Trading Entity", value="KwaNgobese Enterprise")
         
         # Only in-stock items can be selected for a receipt
@@ -888,15 +889,68 @@ def main(page: ft.Page):
                     qty_sold=c['qty']
                 )
 
-            # Copy receipt to clipboard
-            page.clipboard = receipt_preview.value
+            receipt_text = receipt_preview.value or ""
+
+            # 1. Safe clipboard copy with fallback across Flet versions
+            try:
+                if hasattr(page, "set_clipboard"):
+                    page.set_clipboard(receipt_text)
+                else:
+                    page.clipboard = receipt_text
+            except Exception:
+                pass
+
             show_alert("Slip copied to clipboard! Opening WhatsApp...")
 
-            # Open WhatsApp with encoded receipt text
-            encoded = urllib.parse.quote(receipt_preview.value)
-            page.launch_url(f"https://wa.me/?text={encoded}")
+            # 2. Format phone number if provided (convert local 0XX to international 27XX)
+            raw_phone = cust_phone_in.value.strip() if cust_phone_in.value else ""
+            clean_digits = "".join(filter(str.isdigit, raw_phone))
+            target_phone = ""
+            if clean_digits.startswith("0") and len(clean_digits) == 10:
+                target_phone = "27" + clean_digits[1:]
+            elif clean_digits.startswith("27") and len(clean_digits) >= 11:
+                target_phone = clean_digits
+            elif clean_digits:
+                target_phone = clean_digits
 
-            # Reset cart and refresh view
+            # 3. Construct direct WhatsApp app intent URI & universal web fallback
+            encoded = urllib.parse.quote(receipt_text)
+            if target_phone:
+                whatsapp_native_url = f"whatsapp://send?phone={target_phone}&text={encoded}"
+                whatsapp_web_url = f"https://wa.me/{target_phone}?text={encoded}"
+            else:
+                whatsapp_native_url = f"whatsapp://send?text={encoded}"
+                whatsapp_web_url = f"https://wa.me/?text={encoded}"
+
+            # 4. Safe launch sequence: Direct App -> Universal Web -> Silent Clipboard Guard
+            launched = False
+            try:
+                if hasattr(page, "open"):
+                    page.open(whatsapp_native_url)
+                    launched = True
+                elif hasattr(page, "launch_url"):
+                    page.launch_url(whatsapp_native_url)
+                    launched = True
+                else:
+                    page.url = whatsapp_native_url
+                    page.update()
+                    launched = True
+            except Exception:
+                launched = False
+
+            if not launched:
+                try:
+                    if hasattr(page, "open"):
+                        page.open(whatsapp_web_url)
+                    elif hasattr(page, "launch_url"):
+                        page.launch_url(whatsapp_web_url)
+                    else:
+                        page.url = whatsapp_web_url
+                        page.update()
+                except Exception:
+                    show_alert("Copied to clipboard (paste directly into WhatsApp).")
+
+            # 5. Reset cart and refresh view
             cart.clear()
             cash_paid_in.value = ""
             render_current_view()
@@ -912,6 +966,7 @@ def main(page: ft.Page):
                     content=ft.Column([
                         biz_name_in,
                         cust_name_in,
+                        cust_phone_in,
                         ft.Row([item_drop, qty_drop], spacing=6),
                         ft.Button(
                             "Add Item to Invoice",
