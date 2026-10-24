@@ -797,8 +797,8 @@ def main(page: ft.Page):
 
             lines = [
                 "================================",
-                f"   {biz_name_in.value.upper()}   ",
-                "   OFFLINE DIGITAL RECEIPT SLIP   ",
+                f" {biz_name_in.value.upper()} ",
+                " OFFLINE DIGITAL RECEIPT SLIP ",
                 "================================",
                 f"Date: {now_str}",
                 f"Client: {cust_name_in.value}",
